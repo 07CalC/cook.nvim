@@ -1,0 +1,42 @@
+-- Example recipes.lua file for cook.nvim
+-- Place this file in your project root to define custom tasks
+--
+-- Placeholders available:
+--   {file}     - Full file path
+--   {filename} - Filename with extension
+--   {name}     - Filename without extension
+--   {dir}      - Directory path
+--   {ext}      - File extension
+--   {exe}      - Full executable path (dir + name)
+
+return {
+	recipes = {
+		-- Simple project-wide commands
+		dev = "npm run dev",
+		build = "npm run build",
+		test = "npm test",
+		lint = "npm run lint",
+		format = "npm run format",
+
+		-- File-specific commands using placeholders
+		compile = "gcc {file} -o {exe} -Wall",
+		run = "{exe}",
+		compile_and_run = "gcc {file} -o {exe} && {exe}",
+
+		-- Advanced examples
+		debug = "gcc -g {file} -o {exe} && gdb {exe}",
+		valgrind = "gcc -g {file} -o {exe} && valgrind {exe}",
+		profile = "gcc -pg {file} -o {exe} && {exe} && gprof {exe}",
+
+		-- Combine placeholders creatively
+		backup = "cp {file} {file}.bak",
+		archive = "tar -czf {name}.tar.gz {file}",
+
+		-- Integration with Vim commands (prefix with !)
+		cmake_build = "!CMakeBuild",
+		cmake_run = "!CMakeRun",
+
+		-- Legacy %s syntax also supported
+		-- old_style = "python3 %s",
+	},
+}

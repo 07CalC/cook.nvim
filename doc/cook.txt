@@ -1,7 +1,7 @@
 *cook.txt*		Cook.nvim plugin manual
 
 			Author: 07CalC <https://github.com/07CalC>
-			Version: 1.0.0
+			Version: 2.0.0
 
 ==============================================================================
 INTRODUCTION							*cook*
@@ -9,12 +9,17 @@ INTRODUCTION							*cook*
 Cook.nvim is a lightweight and extensible plugin to run or compile code based
 on filetype or per-project tasks - inside a terminal.
 
+Features:
+- Extensible placeholder system for any language
+- Named placeholders: {file}, {name}, {dir}, {exe}, etc.
+- Backward compatible with legacy %s syntax
+- Project-specific recipes with placeholder support
+- Floating/split terminal layouts
+- Competitive programming mode with clipboard input
+
 Supports (out of the box):
-- Python
-- Rust
-- C / C++
-- JavaScript / TypeScript
-- Go
+- Python, Rust, C/C++, JavaScript, TypeScript, Go
+- Easy to add: Java, Assembly, Ruby, Lua, and any language!
 - Custom project recipes
 
 ==============================================================================
@@ -42,33 +47,135 @@ require("cook").setup({
     border = "rounded", -- border style for floating terminal
   },
   runners = {
-    py = "python3 %s",
-    c = "gcc %s -o %s && %s",
-    -- Add your own mappings...
+    -- New named placeholder syntax (recommended):
+    py = "python3 {file}",
+    c = "gcc {file} -o {exe} && {exe}",
+    cpp = "g++ {file} -o {exe} -std=c++17 && {exe}",
+    
+    -- Legacy %s syntax (still supported):
+    -- py = "python3 %s",
+    -- c = "gcc %s -o %s && %s",
   },
 })
 ```
 
+See |cook-placeholders| for details on the placeholder system.
+
+==============================================================================
+PLACEHOLDERS						*cook-placeholders*
+
+Cook.nvim supports a powerful placeholder system for customizing runners.
+
+Named Placeholders:~
+  {file}        Full file path
+                Example: /home/user/project/main.c
+
+  {filename}    Filename with extension
+                Example: main.c
+
+  {name}        Filename without extension
+                Example: main
+
+  {dir}         Directory path
+                Example: /home/user/project
+
+  {ext}         File extension
+                Example: c
+
+  {exe}         Executable path (directory + name)
+                Example: /home/user/project/main
+
+Legacy Syntax:~
+  %s            Single placeholder - replaced with {file}
+                Example: "python3 %s" → "python3 /path/to/file.py"
+
+  %s %s %s      Triple placeholder - replaced with {file}, {exe}, {exe}
+                Example: "gcc %s -o %s && %s" → "gcc file.c -o file && file"
+
+Both syntaxes are fully supported and can coexist in the same configuration!
+
+Examples:~
+  Simple languages:
+    py = "python3 {file}"
+    js = "node {file}"
+    sh = "bash {file}"
+
+  Compiled languages:
+    c = "gcc {file} -o {exe} -Wall && {exe}"
+    cpp = "g++ {file} -o {exe} -std=c++20 && {exe}"
+    rust = "rustc {file} -o {exe} && {exe}"
+
+  Advanced examples:
+    java = "javac {file} && java -cp {dir} {name}"
+    go = "go build -o {exe} {file} && {exe}"
+    asm = "nasm -f elf64 {file} -o {name}.o && ld {name}.o -o {exe} && {exe}"
+    tex = "cd {dir} && pdflatex {filename}"
+
+  TypeScript with custom output:
+    ts = "tsc {file} --outDir {dir}/dist && node {dir}/dist/{name}.js"
+
+  C with debugging:
+    c = "gcc -g -Wall {file} -o {exe} && gdb {exe}"
+
 ==============================================================================
 RECIPES							       *cook-recipes*
 
-Place a `recipes.lua` file in your project root (or repo with .git). Example:
+Place a `recipes.lua` file in your project root (or repo with .git).
 
+Recipes now support placeholders too! See |cook-placeholders|
+
+Basic Example:~
 ```lua
 return {
   recipes = {
+    -- Simple project-wide commands
     test = "pytest tests/",
     build = "make",
     deploy = "scp -r . user@server:/path/to/deploy",
-    build = "!CMakeBuild",
+    
+    -- Vim command integration (prefix with !)
+    cmake_build = "!CMakeBuild",
   }
 }
 ```
-Then use `:Cook test` to run the `pytest tests/` command.
-You can also use `!` to run Neovim commands, like `!CMakeBuild` to trigger a custom
+
+Advanced Example with Placeholders:~
 ```lua
-  build = "!CMakeBuild",
+return {
+  recipes = {
+    -- File-specific recipes using placeholders
+    compile = "gcc {file} -o {exe} -Wall",
+    run = "{exe}",
+    debug = "gcc -g {file} -o {exe} && gdb {exe}",
+    valgrind = "gcc -g {file} -o {exe} && valgrind {exe}",
+    
+    -- Combine file-specific and project commands
+    build_and_run = "mkdir -p build && gcc {file} -o build/{name} && build/{name}",
+    
+    -- Testing with current file
+    test_file = "npm test -- {filename}",
+    
+    -- Format/lint current file
+    format = "clang-format -i {file}",
+    lint = "eslint {file}",
+    
+    -- Legacy %s syntax also supported
+    old_style = "python3 %s",
+  }
+}
 ```
+
+Usage:~
+  :Cook compile       Compiles current file with -Wall flag
+  :Cook run           Runs the compiled executable
+  :Cook debug         Compiles with debug symbols and opens gdb
+
+When you run `:Cook compile` from `main.c`, it executes:
+  gcc /path/to/main.c -o /path/to/main -Wall
+
+Placeholders are substituted based on the current buffer's file!
+
+See recipes.lua.example in the plugin directory for more examples.
 
 ==============================================================================
 MAPPINGS					               *cook-mappings*
@@ -89,11 +196,93 @@ Useful for competitive programming or quick tests.
 ==============================================================================
 TROUBLESHOOTING						       *cook-troubleshooting*
 
-- Ensure no conflicting mappings for `<leader><leader>t`.
-- If terminal doesn't open, check Neovim version (requires 0.7+).
-- If commands fail, verify your `runners` setup in `setup()`.
-- For custom recipes, ensure `recipes.lua` is in the project root or git repo.
-- If using custom commands, ensure they are executable in your environment.
+Common Issues:~
+
+Q: My runner doesn't work!
+A: Check that you're using valid placeholder syntax:
+   - New style: {file}, {name}, {dir}, {exe}, {filename}, {ext}
+   - Old style: single %s or triple %s %s %s
+   - No placeholders: "cargo run" works without any placeholders
+
+Q: How do I migrate from old %s syntax?
+A: Both syntaxes are supported! Migrate at your own pace:
+   Old: py = "python3 %s"
+   New: py = "python3 {file}"
+   Both work identically.
+
+Q: Can I use placeholders in recipes.lua?
+A: Yes! Recipes support the same placeholder system:
+   compile = "gcc {file} -o {exe} -Wall"
+
+Q: Terminal doesn't open
+A: Ensure Neovim version 0.7+ and check terminal layout config.
+
+Q: Conflicting mappings
+A: Check for conflicts with `<leader><leader>t` keybinding.
+
+Q: Recipe not found
+A: Ensure `recipes.lua` exists in project root or git repository.
+
+Q: Command fails to execute
+A: Verify the command works in your shell first.
+   Check that all tools (gcc, python3, etc.) are in your PATH.
+
+Q: Unknown placeholder warning
+A: You used a placeholder that doesn't exist. Valid placeholders:
+   {file}, {filename}, {name}, {dir}, {ext}, {exe}
+
+See |cook-placeholders| for the complete placeholder reference.
+
+==============================================================================
+EXAMPLES							*cook-examples*
+
+Multi-Language Configuration:~
+```lua
+require("cook").setup({
+  runners = {
+    -- Scripting
+    py = "python3 {file}",
+    rb = "ruby {file}",
+    lua = "lua {file}",
+    sh = "bash {file}",
+    
+    -- Compiled
+    c = "gcc {file} -o {exe} -Wall -Wextra && {exe}",
+    cpp = "g++ {file} -o {exe} -std=c++20 && {exe}",
+    rs = "rustc {file} && {exe}",
+    go = "go run {file}",
+    
+    -- JVM
+    java = "javac {file} && java -cp {dir} {name}",
+    
+    -- Web
+    js = "node {file}",
+    ts = "ts-node {file}",
+    
+    -- Legacy syntax (still works!)
+    php = "php %s",
+  },
+})
+```
+
+C/C++ Project Recipes:~
+```lua
+-- recipes.lua
+return {
+  recipes = {
+    compile_debug = "gcc -g -Wall {file} -o {exe}",
+    compile_release = "gcc -O3 {file} -o {exe}",
+    run = "{exe}",
+    valgrind = "gcc -g {file} -o {exe} && valgrind --leak-check=full {exe}",
+    gdb = "gcc -g {file} -o {exe} && gdb {exe}",
+    asan = "gcc -g -fsanitize=address {file} -o {exe} && {exe}",
+  }
+}
+```
+
+For more examples, see:
+  - README.md in the plugin directory
+  - recipes.lua.example for recipe templates
 
 
 vim:tw=78:ts=8:noet:ft=help:norl:

@@ -25,7 +25,9 @@ function M.cook(args)
 			vim.notify("Recipe '" .. args.args .. "' not found.", vim.log.levels.ERROR)
 			return
 		end
-		executor.run(task)
+		-- resolve recipe with placeholder substitution
+		local resolved_task = recipes.resolve_recipe(task, raw)
+		executor.run(resolved_task)
 		return
 	end
 
@@ -50,7 +52,9 @@ function M.cook(args)
 			end,
 		}, function(choice)
 			if choice then
-				executor.run(choice.cmd)
+				-- Resolve recipe with placeholder substitution
+				local resolved_cmd = recipes.resolve_recipe(choice.cmd, raw)
+				executor.run(resolved_cmd)
 			else
 				vim.notify("No recipe selected.", vim.log.levels.INFO)
 			end
